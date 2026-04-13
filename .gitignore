@@ -1,0 +1,29 @@
+# vscode
+.vscode 
+
+# Intellij
+*.iml
+.idea
+
+# npm
+node_modules
+
+# Exclude sourcemaps
+*.map
+
+
+# Exclude macOS Finder (System Explorer) View States
+.DS_Store
+
+# Claude Code internal files
+.claude/
+
+# User library data (personal reading progress, settings)
+data.json
+
+# Internal tooling
+.atl/
+
+# Backup files
+*\ copy.*
+* copy.*

@@ -1,0 +1,10 @@
+{
+  "id": "ldr-obsidian-reader",
+  "name": "LDR | Reader",
+  "version": "0.2.0",
+  "minAppVersion": "1.0.0",
+  "description": "Read .epub books and .cbz comics directly inside your Obsidian vault.",
+  "author": "LDR_Dev",
+  "authorUrl": "https://github.com/ldr-devx",
+  "isDesktopOnly": false
+}
