@@ -106,7 +106,7 @@ export class LibraryScanner {
 		// ── Procesar PDFs ───────────────────────────────────────
 		for (const file of pdfFiles) {
 			const existing = existingByPath.get(file.path);
-			if (existing) continue; // PDFs: no refrescar metadatos (solo son paths)
+			if (existing) continue;
 
 			try {
 				const id = this.generateId(file.path);
@@ -117,6 +117,12 @@ export class LibraryScanner {
 					book.categories = oldData.categories || [];
 					book.isFinished = oldData.isFinished || false;
 					book.dateAdded = oldData.dateAdded || book.dateAdded;
+				}
+
+				// Generar portada desde la primera página del PDF
+				if (!book.coverPath) {
+					const coverPath = await this.generatePdfCover(file);
+					if (coverPath) book.coverPath = coverPath;
 				}
 
 				await this.store.upsertBook(book);
@@ -365,6 +371,87 @@ export class LibraryScanner {
 				: `LDR: ${parts.join(", ")}`,
 			3000,
 		);
+	}
+
+	/**
+	 * Renderiza la primera página de un PDF como imagen JPEG y la guarda
+	 * en la carpeta de portadas del plugin (.ldr-covers/).
+	 *
+	 * Usa OffscreenCanvas (disponible en Electron/Chromium) para renderizar
+	 * sin necesidad de dependencias externas como node-canvas.
+	 *
+	 * Requiere que GlobalWorkerOptions.workerSrc ya esté configurado.
+	 * Si el worker no está listo, la generación se omite sin error fatal.
+	 */
+	private async generatePdfCover(file: TFile): Promise<string | undefined> {
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const pdfjsLib = require("pdfjs-dist/legacy/build/pdf");
+
+			// Intentar inicializar el worker igual que en PdfReaderView
+			if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const fs = require("fs") as typeof import("fs");
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const nodePath = require("path") as typeof import("path");
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const basePath = (this.app.vault.adapter as any).basePath as string | undefined;
+				const candidates = basePath
+					? [nodePath.join(basePath, ".obsidian", "plugins", "ldr-obsidian-reader", "pdf.worker.min.js")]
+					: [];
+				for (const p of candidates) {
+					if (fs.existsSync(p)) {
+						const code = fs.readFileSync(p, "utf8");
+						const blob = new Blob([code], { type: "application/javascript" });
+						pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+						break;
+					}
+				}
+			}
+
+			if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+				console.warn("[LDR] Worker de pdf.js no disponible, omitiendo portada para:", file.name);
+				return undefined;
+			}
+
+			// Leer el PDF del vault
+			const buffer = await this.app.vault.readBinary(file);
+			const pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+			const page = await pdfDoc.getPage(1);
+
+			// Escala pequeña para la miniatura (aprox. 150px de ancho)
+			const viewport = page.getViewport({ scale: 0.4 });
+
+			// OffscreenCanvas está disponible en Electron (Chromium)
+			const canvas = new OffscreenCanvas(
+				Math.floor(viewport.width),
+				Math.floor(viewport.height),
+			);
+			const ctx = canvas.getContext("2d");
+			if (!ctx) return undefined;
+
+			await page.render({ canvasContext: ctx, viewport }).promise;
+
+			// Convertir a JPEG
+			const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+			const arrayBuffer = await blob.arrayBuffer();
+
+			// Guardar en la carpeta de portadas
+			const coverFolder = `${this.store.getLibraryFolder()}/.ldr-covers`;
+			const adapter = this.app.vault.adapter;
+			if (!(await adapter.exists(coverFolder))) {
+				await adapter.mkdir(coverFolder);
+			}
+
+			const safeName = file.basename.replace(/[/\\:*?"<>|]/g, "_");
+			const coverPath = `${coverFolder}/${safeName}.jpg`;
+			await adapter.writeBinary(coverPath, arrayBuffer);
+
+			return coverPath;
+		} catch (e) {
+			console.warn("[LDR] Error generando portada PDF para", file.name, ":", e);
+			return undefined;
+		}
 	}
 }
 

@@ -6,27 +6,8 @@
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfjsLib = require("pdfjs-dist/legacy/build/pdf");
-
-// Configurar el worker de pdfjs con un blob URL.
-// file:// falla en el renderer de Electron (política same-origin de Obsidian).
-// La solución: leer el archivo worker con Node.js fs y exponerlo como blob en memoria.
-// Blob URLs están siempre permitidos para Workers en Electron.
-try {
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const fs = require("fs") as typeof import("fs");
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const nodePath = require("path") as typeof import("path");
-	const workerPath = nodePath.join(
-		__dirname,
-		"node_modules/pdfjs-dist/legacy/build/pdf.worker.js",
-	);
-	const workerCode = fs.readFileSync(workerPath, "utf8");
-	const blob = new Blob([workerCode], { type: "application/javascript" });
-	pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-} catch (e) {
-	console.error("[LDR PDF] No se pudo inicializar el worker de pdf.js:", e);
-	pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-}
+// El worker se inicializa en initWorker() usando app.vault.adapter
+// porque __dirname no es fiable en el bundle compilado por esbuild dentro de Obsidian.
 
 import { ItemView, WorkspaceLeaf, Notice, Platform } from "obsidian";
 import type LdrEpubReaderPlugin from "../../main";
@@ -124,6 +105,75 @@ export class PdfReaderView extends ItemView {
 	getDisplayText() { return this.book?.title ?? "PDF Reader"; }
 	getIcon() { return "file-text"; }
 
+	// ── WORKER INIT ───────────────────────────────────────────────
+
+	/**
+	 * Inicializa GlobalWorkerOptions.workerSrc de pdf.js usando el path real
+	 * del plugin dentro del vault. Se llama en loadBook() en lugar del top-level
+	 * porque en el bundle de esbuild __dirname apunta al proceso de Electron,
+	 * no al directorio del plugin instalado.
+	 *
+	 * Estrategia:
+	 * 1. Usar app.vault.adapter.basePath para localizar el plugin en el vault.
+	 * 2. Fallback: buscar pdf.worker.min.js relativo a __dirname (útil en dev).
+	 * 3. Si nada funciona, loguear el error claramente.
+	 *
+	 * El archivo pdf.worker.min.js debe copiarse al directorio del plugin
+	 * durante el build (esbuild.config.mjs lo hace automáticamente).
+	 */
+	private initWorker(): void {
+		if (pdfjsLib.GlobalWorkerOptions.workerSrc) return; // ya inicializado
+
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const fs = require("fs") as typeof import("fs");
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const nodePath = require("path") as typeof import("path");
+
+			const pluginId = "ldr-obsidian-reader";
+
+			// Candidatos de path en orden de preferencia
+			const candidates: string[] = [];
+
+			// 1. Path real del vault (desktop: FileSystemAdapter expone basePath)
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const basePath = (this.app.vault.adapter as any).basePath as string | undefined;
+			if (basePath) {
+				candidates.push(
+					nodePath.join(basePath, ".obsidian", "plugins", pluginId, "pdf.worker.min.js"),
+				);
+			}
+
+			// 2. Relativo a __dirname (funciona en dev cuando el proyecto está
+			//    linkeado/copiado directamente en .obsidian/plugins/)
+			candidates.push(
+				nodePath.join(__dirname, "pdf.worker.min.js"),
+				nodePath.join(__dirname, "..", "pdf.worker.min.js"),
+				// Fallback al worker sin minificar (más pesado, para dev)
+				nodePath.join(__dirname, "node_modules", "pdfjs-dist", "legacy", "build", "pdf.worker.min.js"),
+				nodePath.join(__dirname, "..", "node_modules", "pdfjs-dist", "legacy", "build", "pdf.worker.min.js"),
+			);
+
+			for (const workerPath of candidates) {
+				if (fs.existsSync(workerPath)) {
+					const workerCode = fs.readFileSync(workerPath, "utf8");
+					const blob = new Blob([workerCode], { type: "application/javascript" });
+					pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+					console.log("[LDR PDF] Worker inicializado desde:", workerPath);
+					return;
+				}
+			}
+
+			console.error(
+				"[LDR PDF] No se encontró pdf.worker.min.js. Rutas intentadas:\n" +
+				candidates.join("\n") +
+				"\n\nAsegúrate de ejecutar `npm run build` o `npm run dev` para copiar el worker.",
+			);
+		} catch (e) {
+			console.error("[LDR PDF] Error inicializando worker de pdf.js:", e);
+		}
+	}
+
 	async onOpen() {
 		const root = this.containerEl.children[1] as HTMLElement;
 		root.empty();
@@ -147,6 +197,7 @@ export class PdfReaderView extends ItemView {
 	// ── LOAD BOOK ─────────────────────────────────────────────────
 
 	async loadBook(bookId: string) {
+		this.initWorker();
 		const book = this.plugin.store.getBook(bookId);
 		if (!book) { new Notice("Book not found."); return; }
 		this.book = book;
