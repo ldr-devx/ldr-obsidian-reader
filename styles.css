@@ -2126,20 +2126,6 @@ body.ldr-fullscreen .mod-root {
 	padding-right: max(12px, env(safe-area-inset-right));
 }
 
-.ldr-pdf-header.is-hidden,
-.ldr-pdf-footer.is-hidden {
-	transform: translateY(-110%);
-	opacity: 0;
-	pointer-events: none;
-	position: absolute;
-	width: 100%;
-	z-index: -1;
-}
-
-.ldr-pdf-footer.is-hidden {
-	transform: translateY(110%);
-	bottom: 0;
-}
 
 .ldr-pdf-title {
 	flex: 1;
@@ -2195,19 +2181,16 @@ body.ldr-fullscreen .mod-root {
 
 /* Sidebar */
 .ldr-pdf-sidebar {
-	width: 0;
+	/* El width se controla siempre por inline style desde JS */
+	width: 0px;
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 	background: rgba(255, 255, 255, 0.03);
 	border-right: 1px solid rgba(160, 140, 220, 0.12);
-	transition: width 0.22s ease;
+	transition: width 0.2s ease;
 	flex-shrink: 0;
 	position: relative; /* needed for resize handle */
-}
-
-.ldr-pdf-sidebar.is-open {
-	width: 140px;
 }
 
 .ldr-pdf-sidebar-tabs {
@@ -2329,69 +2312,71 @@ body.ldr-fullscreen .mod-root {
 	transition: none;
 }
 
-/* Contenedor scrollable principal — scroll nativo del browser */
-.ldr-pdf-scroll {
+/* Viewport */
+.ldr-pdf-viewport {
 	flex: 1;
 	overflow-y: auto;
-	overflow-x: hidden;
+	overflow-x: auto;
+	position: relative;
+	background: #1a1a2e;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+/* Contenedor de todas las páginas en scroll infinito */
+.ldr-pdf-pages {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	position: relative;
-	background: #1a1a2e;
-	/* scroll-behavior: smooth; — NO usar, causa lag en cambios de página programáticos */
+	gap: 8px;
+	padding: 8px 0 32px;
+	min-width: 100%;
 }
 
-/* Cursor grab cuando hay zoom activo (JS lo gestiona vía style.cursor) */
-.ldr-pdf-scroll.is-zoomed {
-	cursor: grab;
-}
-.ldr-pdf-scroll.is-zoomed:active {
-	cursor: grabbing;
-}
-
-/* Spread: uno o dos canvas centrados */
-.ldr-pdf-spread {
+/* Fila de páginas (1 o 2 en modo doble) */
+.ldr-pdf-row {
 	display: flex;
 	flex-direction: row;
 	align-items: flex-start;
 	gap: 8px;
-	transform-origin: top center;
-	/* will-change: transform activo solo durante zoom gestual */
-	padding: 16px 0 32px;   /* padding inferior: deja espacio antes del borde que dispara cambio de página */
+}
+
+/* Slot individual de página */
+.ldr-pdf-page-slot {
+	flex-shrink: 0;
+	position: relative;
+	background: #fff;
+}
+
+.ldr-pdf-page-slot.is-dark {
+	background: #000;
 }
 
 .ldr-pdf-canvas {
 	display: block;
 	max-width: none;
 	flex-shrink: 0;
-	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-	image-rendering: -webkit-optimize-contrast;
-	image-rendering: crisp-edges;
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+	/* Con DPR el canvas ya renderiza a resolución nativa — no necesita hints de escala */
+	image-rendering: auto;
 }
 
 .ldr-pdf-canvas--dark {
 	filter: invert(1) hue-rotate(180deg);
 }
 
-/* Page indicator overlay (immersive mode) */
+/* Page indicator overlay (visible siempre sobre el viewport) */
 .ldr-pdf-page-indicator {
-	position: sticky;
+	position: absolute;
 	bottom: 12px;
-	align-self: center;
+	left: 50%;
+	transform: translateX(-50%);
 	background: rgba(0, 0, 0, 0.65);
 	color: #e0d7ff;
 	font-size: 12px;
 	padding: 4px 10px;
 	border-radius: 20px;
 	pointer-events: none;
-	opacity: 0;
-	transition: opacity 0.2s;
-	z-index: 10;
-}
-
-.ldr-pdf-page-indicator.is-visible {
-	opacity: 1;
 }
 
 /* Footer */

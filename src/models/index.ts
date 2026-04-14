@@ -118,6 +118,8 @@ export interface ReadingState {
 	pdfSidebarTab?: "thumbs" | "toc";
 	/** Ancho del sidebar PDF en px */
 	pdfSidebarWidth?: number;
+	/** Modo oscuro del lector PDF */
+	pdfDarkMode?: boolean;
 }
 
 // ── READER SETTINGS ───────────────────────────────────────────
