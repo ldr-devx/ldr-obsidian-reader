@@ -2329,42 +2329,44 @@ body.ldr-fullscreen .mod-root {
 	transition: none;
 }
 
-/* Viewport */
-.ldr-pdf-viewport {
+/* Contenedor scrollable principal — scroll nativo del browser */
+.ldr-pdf-scroll {
 	flex: 1;
-	overflow: hidden;
+	overflow-y: auto;
+	overflow-x: hidden;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	justify-content: center;
 	position: relative;
 	background: #1a1a2e;
-	cursor: default;        /* El JS gestiona el cursor dinámicamente */
-	touch-action: none;     /* Evita scroll nativo del browser durante gestos */
-	-webkit-user-select: none;
-	user-select: none;
+	/* scroll-behavior: smooth; — NO usar, causa lag en cambios de página programáticos */
 }
 
-.ldr-pdf-viewport:active {
+/* Cursor grab cuando hay zoom activo (JS lo gestiona vía style.cursor) */
+.ldr-pdf-scroll.is-zoomed {
+	cursor: grab;
+}
+.ldr-pdf-scroll.is-zoomed:active {
 	cursor: grabbing;
 }
 
-/* Spread wrapper: contiene uno o dos canvases */
+/* Spread: uno o dos canvas centrados */
 .ldr-pdf-spread {
 	display: flex;
 	flex-direction: row;
 	align-items: flex-start;
-	gap: 4px;
-	transform-origin: center center;
-	will-change: transform;
-	/* Sin transition aquí — el JS la añade temporalmente durante zoom gestual */
+	gap: 8px;
+	transform-origin: top center;
+	/* will-change: transform activo solo durante zoom gestual */
+	padding: 16px 0 32px;   /* padding inferior: deja espacio antes del borde que dispara cambio de página */
 }
 
 .ldr-pdf-canvas {
 	display: block;
 	max-width: none;
 	flex-shrink: 0;
-	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-	image-rendering: -webkit-optimize-contrast; /* nitidez en Electron/Chromium */
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+	image-rendering: -webkit-optimize-contrast;
 	image-rendering: crisp-edges;
 }
 
@@ -2374,10 +2376,9 @@ body.ldr-fullscreen .mod-root {
 
 /* Page indicator overlay (immersive mode) */
 .ldr-pdf-page-indicator {
-	position: absolute;
+	position: sticky;
 	bottom: 12px;
-	left: 50%;
-	transform: translateX(-50%);
+	align-self: center;
 	background: rgba(0, 0, 0, 0.65);
 	color: #e0d7ff;
 	font-size: 12px;
@@ -2386,6 +2387,7 @@ body.ldr-fullscreen .mod-root {
 	pointer-events: none;
 	opacity: 0;
 	transition: opacity 0.2s;
+	z-index: 10;
 }
 
 .ldr-pdf-page-indicator.is-visible {
