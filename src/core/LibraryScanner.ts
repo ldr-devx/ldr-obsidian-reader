@@ -106,7 +106,20 @@ export class LibraryScanner {
 		// ── Procesar PDFs ───────────────────────────────────────
 		for (const file of pdfFiles) {
 			const existing = existingByPath.get(file.path);
-			if (existing) continue;
+
+			// Si ya existe pero no tiene portada, intentar generarla ahora
+			if (existing) {
+				if (!existing.coverPath) {
+					try {
+						const coverPath = await this.generatePdfCover(file);
+						if (coverPath) {
+							existing.coverPath = coverPath;
+							await this.store.upsertBook(existing);
+						}
+					} catch { /* silencioso */ }
+				}
+				continue;
+			}
 
 			try {
 				const id = this.generateId(file.path);
@@ -117,9 +130,10 @@ export class LibraryScanner {
 					book.categories = oldData.categories || [];
 					book.isFinished = oldData.isFinished || false;
 					book.dateAdded = oldData.dateAdded || book.dateAdded;
+					book.coverPath = oldData.coverPath || null;
 				}
 
-				// Generar portada desde la primera página del PDF
+				// Generar portada si no existe
 				if (!book.coverPath) {
 					const coverPath = await this.generatePdfCover(file);
 					if (coverPath) book.coverPath = coverPath;

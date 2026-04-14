@@ -2338,7 +2338,10 @@ body.ldr-fullscreen .mod-root {
 	justify-content: center;
 	position: relative;
 	background: #1a1a2e;
-	cursor: grab;
+	cursor: default;        /* El JS gestiona el cursor dinámicamente */
+	touch-action: none;     /* Evita scroll nativo del browser durante gestos */
+	-webkit-user-select: none;
+	user-select: none;
 }
 
 .ldr-pdf-viewport:active {
@@ -2353,6 +2356,7 @@ body.ldr-fullscreen .mod-root {
 	gap: 4px;
 	transform-origin: center center;
 	will-change: transform;
+	/* Sin transition aquí — el JS la añade temporalmente durante zoom gestual */
 }
 
 .ldr-pdf-canvas {
@@ -2360,6 +2364,8 @@ body.ldr-fullscreen .mod-root {
 	max-width: none;
 	flex-shrink: 0;
 	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+	image-rendering: -webkit-optimize-contrast; /* nitidez en Electron/Chromium */
+	image-rendering: crisp-edges;
 }
 
 .ldr-pdf-canvas--dark {
@@ -2458,6 +2464,12 @@ body.ldr-fullscreen .mod-root {
 	opacity: 1;
 	pointer-events: all;
 	transform: translateY(0);
+}
+
+.ldr-pdf-settings-sep {
+	height: 1px;
+	background: rgba(255, 255, 255, 0.08);
+	margin: 4px 0;
 }
 
 .ldr-pdf-settings-section {
